@@ -7,6 +7,15 @@ fi
 
 export GIT_INDEX_FILE=.git/new-index
 
+# remote branch exists
+if [ `git branch -r | grep -c -E origin/review` == 1 ]; then
+
+	# local branch doesn't exist
+	if [ `git branch -l | grep -c -E review` == 0 ]; then
+		git branch -t review origin/review
+	fi
+fi
+
 parent=`git rev-parse refs/heads/review 2> /dev/null`
 
 #echo teset $parent
