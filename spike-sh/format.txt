@@ -1,0 +1,18 @@
+new-review: SHA-1
+
+---------------------------------------------
+
+added-comment: SHA-1
+(LINE-NUMBER FILE-NAME COMMENT)+
+
+---------------------------------------------
+
+review-aproved: SHA-1
+comment: COMMENT
+
+---------------------------------------------
+
+review-canceled: SHA-1
+comment: COMMENT
+
+---------------------------------------------
