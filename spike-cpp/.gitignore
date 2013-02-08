@@ -1,4 +1,8 @@
 .cproject
 .project
 .settings
-Debug
+Makefile
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+spike-cpp

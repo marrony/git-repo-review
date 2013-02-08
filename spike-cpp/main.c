@@ -8,64 +8,70 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <io.h>
 #include <fcntl.h>
-#include <process.h>
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
+#include <errno.h>
+
+#ifdef WIN32
+#include <io.h>
+#include <process.h>
+#endif
 
 #define READ 0
 #define WRITE 1
 
-#define	PARENT_READ  read_pipe[READ]
-#define	CHILD_WRITE  read_pipe[WRITE]
+#define PARENT_READ  read_pipe[READ]
+#define CHILD_WRITE  read_pipe[WRITE]
 
 #define CHILD_READ   write_pipe[READ]
 #define PARENT_WRITE write_pipe[WRITE]
 
-int execute_program(const char* const* argv, FILE** fr, FILE** fw) {
+int execute_program(char** argv, FILE** fr, FILE** fw) {
 	int read_pipe[2];
 	int write_pipe[2];
 
-	_pipe(read_pipe, 256, O_BINARY | O_NOINHERIT);
-	_pipe(write_pipe, 256, O_BINARY | O_NOINHERIT);
+	pipe(read_pipe);
+	pipe(write_pipe);
 
-	int fdstdin = _dup(_fileno(stdin));
-	int fdstdout = _dup(_fileno(stdout));
+	int fdstdin = dup(STDIN_FILENO);
+	int fdstdout = dup(STDOUT_FILENO);
 
-	if(_dup2(CHILD_READ, _fileno(stdin)) != 0) {
-		printf("dup2\n");
+	if(dup2(CHILD_READ, STDIN_FILENO) < 0)
 		return 1;
-	}
 
-	if(_dup2(CHILD_WRITE, _fileno(stdout)) != 0) {
-		printf("dup2\n");
+	if(dup2(CHILD_WRITE, STDOUT_FILENO) < 0)
 		return 1;
-	}
 
 	close(CHILD_READ);
 	close(CHILD_WRITE);
 
+#ifdef WIN32
 	int id = _spawnvp(P_NOWAIT, argv[0], argv);
+#else
+	int id = fork();
+
+	if(id == 0) {
+		execvp(argv[0], argv);
+		exit(0);
+	}
+#endif
+
 	if(id < 0)
 		return 1;
 
-	if(_dup2(fdstdin, _fileno(stdin)) != 0) {
-		printf("dup2\n");
+	if(dup2(fdstdin, STDIN_FILENO) < 0)
 		return 1;
-	}
 
-	if(_dup2(fdstdout, _fileno(stdout)) != 0) {
-		printf("dup2\n");
+	if(dup2(fdstdout, STDOUT_FILENO) < 0)
 		return 1;
-	}
 
 	close(fdstdin);
 	close(fdstdout);
 
 	*fr = fdopen(PARENT_READ, "r");
-	*fw = fdopen(PARENT_READ, "w");
+	*fw = fdopen(PARENT_WRITE, "w");
 
 	return 0;
 }
@@ -73,9 +79,9 @@ int execute_program(const char* const* argv, FILE** fr, FILE** fw) {
 int main(int argc, char* argv[]) {
 	char bytes[256+1];
 	int nbytes;
-	FILE* fr;
-	FILE* fw;
-	const char* args[] = {"git", "--version", NULL};
+	FILE* fr = NULL;
+	FILE* fw = NULL;
+	char* args[] = {"git", "--version", NULL};
 
 	if(execute_program(args, &fr, &fw))
 		return 1;
@@ -98,8 +104,8 @@ int main(int argc, char* argv[]) {
 		printf("%s", bytes);
 	}
 
-	fclose(fr);
-	fclose(fw);
+	if(fr) fclose(fr);
+	if(fw) fclose(fw);
 
 	return 0;
 }
