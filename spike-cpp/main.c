@@ -28,7 +28,13 @@
 #define CHILD_READ   write_pipe[READ]
 #define PARENT_WRITE write_pipe[WRITE]
 
-int execute_program(char** argv, FILE** fr, FILE** fw) {
+#ifndef pipe
+int pipe(int fd[2]) {
+	return _pipe(fd, 256, O_BINARY | O_NOINHERIT);
+}
+#endif
+
+int execute_program(const char* const* argv, FILE** fr, FILE** fw) {
 	int read_pipe[2];
 	int write_pipe[2];
 
@@ -48,7 +54,7 @@ int execute_program(char** argv, FILE** fr, FILE** fw) {
 	close(CHILD_WRITE);
 
 #ifdef WIN32
-	int id = _spawnvp(P_NOWAIT, argv[0], argv);
+	int id = _spawnvp(P_NOWAIT, argv[0], (const char* const*)argv);
 #else
 	int id = fork();
 
@@ -70,20 +76,26 @@ int execute_program(char** argv, FILE** fr, FILE** fw) {
 	close(fdstdin);
 	close(fdstdout);
 
-	*fr = fdopen(PARENT_READ, "r");
-	*fw = fdopen(PARENT_WRITE, "w");
+	if(fr)
+		*fr = fdopen(PARENT_READ, "r");
+	else
+		close(PARENT_READ);
+
+	if(fw)
+		*fw = fdopen(PARENT_WRITE, "w");
+	else
+		close(PARENT_WRITE);
 
 	return 0;
 }
 
-int main(int argc, char* argv[]) {
+int git_version() {
 	char bytes[256+1];
 	int nbytes;
 	FILE* fr = NULL;
-	FILE* fw = NULL;
-	char* args[] = {"git", "--version", NULL};
+	const char* args[] = {"git", "--version", NULL};
 
-	if(execute_program(args, &fr, &fw))
+	if(execute_program(args, &fr, NULL))
 		return 1;
 
 	while(!feof(fr)) {
@@ -92,20 +104,80 @@ int main(int argc, char* argv[]) {
 		if(nbytes == 0)
 			break;
 
-		if(nbytes < 0 && errno == EINTR) {
-			continue;
-		}
-
-		if(nbytes < 0)
-			break;
-
 		bytes[nbytes] = 0;
 
 		printf("%s", bytes);
 	}
 
 	if(fr) fclose(fr);
-	if(fw) fclose(fw);
+
+	return 0;
+}
+
+void rev_parse(const char* refspec, char sha1[40]) {
+	const char* cmd[] = {"git", "rev-parse", refspec, NULL};
+	FILE* fr = NULL;
+
+	execute_program(cmd, &fr, NULL);
+
+	fread(sha1, 1, 40, fr);
+	fclose(fr);
+}
+
+int get_last_commit(char sha1[40]) {
+	rev_parse("refs/heads/review", sha1);
+
+	return strncmp(sha1, "refs/heads/review\n", 40) != 0;
+}
+
+void update_ref(const char* refspec, const char* sha1) {
+	const char* cmd[] = {"git", "update-ref", refspec, sha1, NULL};
+	execute_program(cmd, NULL, NULL);
+}
+
+void commit_tree(const char* message, const char* tsha1, const char* parent, char csha1[40]) {
+	FILE* fr = NULL;
+	FILE* fw = NULL;
+
+	if(parent) {
+		const char* cmd[] = {"git", "commit-tree", tsha1, "-p", parent, NULL};
+
+		if(execute_program(cmd, &fr, &fw))
+			return;
+	} else {
+		const char* cmd[] = {"git", "commit-tree", tsha1, NULL};
+
+		if(execute_program(cmd, &fr, &fw))
+			return;
+	}
+
+	fwrite(message, 1, strlen(message), fw);
+	fclose(fw);
+
+	fread(csha1, 1, 40, fr);
+	fclose(fr);
+
+	update_ref("refs/heads/review", csha1);
+}
+
+struct review {
+	char sha1[40];
+};
+
+void create_review(const char* sha1) {
+
+}
+
+#define EMPTY_TREE "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+int main(int argc, char* argv[]) {
+	char parent[41] = {0};
+	char csha1[41] = {0};
+
+	int has_parent = get_last_commit(parent);
+
+	commit_tree("teste de commit", EMPTY_TREE, has_parent ? parent : NULL, csha1);
+	printf("%s", csha1);
 
 	return 0;
 }
