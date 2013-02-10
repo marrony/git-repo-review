@@ -9,5 +9,5 @@ project(spike-cpp C)
 #        set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage -pg")
 #endif()
 
-add_executable(spike-cpp main.c)
+add_executable(spike-cpp main.c git.c exec.c)
 target_link_libraries(spike-cpp)
