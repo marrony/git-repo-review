@@ -4,6 +4,7 @@ import org.eclipse.swt.custom.ExtendedModifyEvent;
 import org.eclipse.swt.custom.ExtendedModifyListener;
 import org.eclipse.swt.custom.StyleRange;
 import org.eclipse.swt.custom.StyledText;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 
@@ -37,7 +38,7 @@ public class SyntaxColoring {
       }
     });
 
-    styledText.setBounds(10, 10, 500, 100);
+    shell.setSize(500, 500);
     shell.open();
     while (!shell.isDisposed()) {
       if (!display.readAndDispatch()) {
