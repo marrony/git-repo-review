@@ -11,6 +11,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.reviewer.model.Command;
+
 public class Context {
 	private static Map<CommandType, Class<? extends Command>> typeToClass;
 	private static Map<Class<? extends Command>, CommandType> classToType;

@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.reviewer.commands.AddComment;
 import com.reviewer.commands.AddFileComment;
-import com.reviewer.commands.Command;
 import com.reviewer.commands.Context;
 import com.reviewer.commands.NewReview;
 

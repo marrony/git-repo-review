@@ -3,7 +3,6 @@ package com.reviewer.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.reviewer.commands.Command;
 
 public class System {
 	

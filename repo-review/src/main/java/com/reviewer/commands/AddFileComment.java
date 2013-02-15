@@ -4,31 +4,30 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import com.reviewer.io.IOUtil;
+import com.reviewer.model.Command;
 import com.reviewer.model.System;
 
-public class AddFileComment extends Command {
+public class AddFileComment implements Command {
 	public String review = "";
 	public String file = "";
 	public int line;
 	public String comment = "";
 
-	@Override
 	public void read(DataInput input) throws IOException {
-		review = readSha1(input);
-		file = readString(input);
+		review = IOUtil.readSha1(input);
+		file = IOUtil.readString(input);
 		line = input.readInt();
-		comment = readString(input);
+		comment = IOUtil.readString(input);
 	}
 
-	@Override
 	public void write(DataOutput output) throws IOException {
-		writeSha1(output, review);
-		writeString(output, file);
+		IOUtil.writeSha1(output, review);
+		IOUtil.writeString(output, file);
 		output.writeInt(line);
-		writeString(output, comment);
+		IOUtil.writeString(output, comment);
 	}
 
-	@Override
 	public void apply(System system) {
 		system.addFileComment(review, file, line, comment);
 	}
