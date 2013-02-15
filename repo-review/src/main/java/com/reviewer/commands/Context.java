@@ -7,9 +7,28 @@ import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Context {
+	private static Map<CommandType, Class<? extends Command>> typeToClass;
+	private static Map<Class<? extends Command>, CommandType> classToType;
+	
+	{
+		typeToClass = new HashMap<CommandType, Class<? extends Command>>();
+		classToType = new HashMap<Class<? extends Command>, CommandType>();
+		
+		register(CommandType.ADD_REVIEW, NewReview.class);
+		register(CommandType.ADD_COMMENT, AddComment.class);
+		register(CommandType.ADD_FILE_COMMENT, AddFileComment.class);
+	}
+	
+	private static void register(CommandType type, Class<? extends Command> clazz) {
+		typeToClass.put(type, clazz);
+		classToType.put(clazz, type);
+	}
+	
 	private byte[] bytes;
 
 	public List<Command> deserialize() throws Exception {
@@ -19,23 +38,10 @@ public class Context {
 		List<Command> commands = new ArrayList<Command>();
 		
 		while(in.available() > 0) {
-			Command command = null;
 			CommandType type = CommandType.fromValue(input.readInt());
+			Class<? extends Command> clazz = typeToClass.get(type);
 			
-			switch(type) {
-			case ADD_REVIEW:
-				command = new NewReview();
-				break;
-				
-			case ADD_COMMENT:
-				command = new AddComment();
-				break;
-				
-			case ADD_FILE_COMMENT:
-				command = new AddFileComment();
-				break;
-			}
-			
+			Command command = clazz.newInstance();
 			command.read(input);
 			commands.add(command);
 		}
@@ -48,7 +54,9 @@ public class Context {
 		DataOutput output = new DataOutputStream(out);
 		
 		for(Command command : commands) {
-			output.writeInt(command.getType().getValue());
+			CommandType type = classToType.get(command.getClass());
+			
+			output.writeInt(type.getValue());
 			command.write(output);
 		}
 		

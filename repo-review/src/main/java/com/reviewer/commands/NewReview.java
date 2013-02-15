@@ -13,11 +13,6 @@ public class NewReview extends Command {
 	public List<String> commits = new ArrayList<String>();
 	
 	@Override
-	public CommandType getType() {
-		return CommandType.ADD_REVIEW;
-	}
-
-	@Override
 	public void read(DataInput input) throws IOException {
 		hash = readSha1(input);
 		

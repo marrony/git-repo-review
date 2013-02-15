@@ -7,8 +7,6 @@ import java.io.IOException;
 import com.reviewer.model.System;
 
 public abstract class Command {
-	public abstract CommandType getType();
-
 	public abstract void read(DataInput input) throws IOException;
 
 	public abstract void write(DataOutput output) throws IOException;

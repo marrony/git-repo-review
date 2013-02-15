@@ -13,11 +13,6 @@ public class AddFileComment extends Command {
 	public String comment = "";
 
 	@Override
-	public CommandType getType() {
-		return CommandType.ADD_FILE_COMMENT;
-	}
-
-	@Override
 	public void read(DataInput input) throws IOException {
 		review = readSha1(input);
 		file = readString(input);
