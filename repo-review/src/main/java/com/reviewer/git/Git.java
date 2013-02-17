@@ -3,11 +3,12 @@ package com.reviewer.git;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-
-import org.eclipse.swt.internal.Platform;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Git {
 
@@ -18,7 +19,7 @@ public class Git {
 	private static final int S_IEXEC = 0x0040;
 	private static final int S_IFMT = 0xF000;
 
-	enum FileMode {
+	public static enum FileMode {
 		DIRECTORY(S_IFDIR),
 		REGULAR_EXECUTABLE(S_IFREG | 0755),
 		REGULAR_NON_EXECUTABLE(S_IFREG | 0644),
@@ -30,12 +31,31 @@ public class Git {
 		FileMode(int flags) {
 			this.flags = flags;
 		}
+		
+		public static FileMode fromFlags(int flags) {
+			for(FileMode mode : values()) {
+				if(flags == mode.flags)
+					return mode;
+			}
+			return null;
+		}
 	}
 
 	private static Process execGit(String format) throws IOException {
 		return Runtime.getRuntime().exec(format);
 	}
 
+	private static Process execGitAndWait(String format) throws IOException {
+		Process process = Runtime.getRuntime().exec(format);
+		
+		try {
+			process.waitFor();
+		} catch (InterruptedException e) {
+		}
+		
+		return process;
+	}
+	
 	private static BufferedReader getReader(Process process) {
 		return new BufferedReader(new InputStreamReader(
 				process.getInputStream()));
@@ -72,31 +92,27 @@ public class Git {
 	}
 
 	public static String version() throws IOException {
-		Process process = execGit("git --version");
+		Process process = execGitAndWait("git --version");
 		BufferedReader reader = getReader(process);
 		return reader.readLine();
 	}
 
 	public static String rev_parse(String refspec) throws IOException {
-		Process process = execGit(String.format("git rev-parse %s", refspec));
+		Process process = execGitAndWait(String.format("git rev-parse %s", refspec));
 		BufferedReader reader = getReader(process);
 		return reader.readLine();
 	}
 
-	public static void update_ref(String refspec, String sha1)
-			throws IOException, InterruptedException {
-		Process process = execGit(String.format("git update-ref %s %s",
-				refspec, sha1));
+	public static void update_ref(String refspec, String sha1) throws IOException, InterruptedException {
+		Process process = execGitAndWait(String.format("git update-ref %s %s", refspec, sha1));
 		process.waitFor();
 	}
 
-	public static String commit_tree(String message, String tsha1, String parent)
-			throws IOException {
+	public static String commit_tree(String message, String tsha1, String parent) throws IOException {
 		final Process process;
 
 		if (parent != null) {
-			process = execGit(String.format("git commit-tree %s -p %s", tsha1,
-					parent));
+			process = execGit(String.format("git commit-tree %s -p %s", tsha1, parent));
 		} else {
 			process = execGit(String.format("git commit-tree %s", tsha1));
 		}
@@ -107,15 +123,7 @@ public class Git {
 		writer.write(message);
 		writer.close();
 
-		String csha1 = reader.readLine();
-
-		try {
-			update_ref("refs/heads/review", csha1);
-		} catch (InterruptedException e) {
-			return null;
-		}
-
-		return csha1;
+		return reader.readLine();
 	}
 
 	public static String hash_object(byte[] bytes) throws IOException {
@@ -135,7 +143,7 @@ public class Git {
 	}
 
 	public static String write_tree() throws IOException {
-		Process process = execGit("git write-tree");
+		Process process = execGitAndWait("git write-tree");
 		BufferedReader reader = getReader(process);
 		return reader.readLine();
 	}
@@ -147,14 +155,11 @@ public class Git {
 
 		public String sha1;
 
-		public void add(FileMode mode, String type, String sha1, String file)
-				throws IOException {
-			writer.write(String.format("%06o %s %40s\t%s\n", mode.flags, type,
-					sha1, file));
+		public void add(FileMode mode, String type, String sha1, String file) throws IOException {
+			writer.write(String.format("%06o %s %40s\t%s\n", mode.flags, type, sha1, file));
 		}
 
-		public void addBlob(FileMode mode, String sha1, String file)
-				throws IOException {
+		public void addBlob(FileMode mode, String sha1, String file) throws IOException {
 			add(mode, "blob", sha1, file);
 		}
 
@@ -180,7 +185,87 @@ public class Git {
 
 		return tree;
 	}
+	
+	public static String file_type(String sha1) throws IOException {
+		Process process = execGitAndWait(String.format("git cat-file -t %s", sha1));
+		
+		return getReader(process).readLine();
+	}
+	
+	public static class GitFile {
+		public FileMode filemode;
+		public String filetype;
+		public String sha1;
+		public String filename;
+	}
 
+	public static List<GitFile> ls_tree(String tree) throws IOException {
+		final Process process;
+		
+		if("tree".equals(file_type(tree))) {
+			process = execGitAndWait(String.format("git cat-file -p tree", tree));
+		} else {
+			process = execGitAndWait(String.format("git cat-file -p %s^{tree}", tree));
+		}
+		
+		BufferedReader reader = getReader(process);
+		
+		List<GitFile> files = new ArrayList<GitFile>();
+		
+		String line;
+		while((line = reader.readLine()) != null) {
+			String[] strings = line.split("[ \t\n]");
+			
+			String filemode = strings[0];
+			String filetype = strings[1];
+			String sha1 = strings[2];
+			String filename = strings[3];
+			
+			GitFile file = new GitFile();
+
+			file.filemode = FileMode.fromFlags(Integer.parseInt(filemode, 8));
+			file.filetype = filetype;
+			file.sha1 = sha1;
+			file.filename = filename;
+			
+			files.add(file);
+		}
+		
+		return files;
+	}
+	
+	public static void delete_branch(String branch, boolean force) throws IOException {
+		if(force)
+			execGitAndWait(String.format("git branch -D %s", branch));
+		else
+			execGitAndWait(String.format("git branch -d %s", branch));
+	}
+	
+	public static void delete_branch(String branch) throws IOException {
+		delete_branch(branch, false);
+	}
+
+	public static void cat_file(String sha1, OutputStream out) throws IOException {
+		Process process = execGitAndWait(String.format("git cat-file -p %s", sha1));
+		
+		InputStream in = process.getInputStream();
+		
+		byte[] bytes = new byte[1024];
+		while(in.available() > 0) {
+			int nbytes = in.read(bytes);
+			
+			out.write(bytes, 0, nbytes);
+		}
+		
+		in.close();
+	}
+	
+	public static String author_name_and_date(String sha1) throws IOException {
+		Process process = execGitAndWait(String.format("git log --format=\"%%an%%x09%%at\" %s", sha1));
+		BufferedReader reader = getReader(process);
+		return reader.readLine();
+	}
+	
 	public static void main(String[] args) throws IOException {
 		System.out.println(Git.version());
 

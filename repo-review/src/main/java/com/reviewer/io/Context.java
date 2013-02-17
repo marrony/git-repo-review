@@ -1,4 +1,4 @@
-package com.reviewer.commands;
+package com.reviewer.io;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -6,11 +6,16 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.reviewer.commands.AddComment;
+import com.reviewer.commands.AddFileComment;
+import com.reviewer.commands.CommandType;
+import com.reviewer.commands.NewReview;
 import com.reviewer.model.Command;
 
 public class Context {
@@ -32,8 +37,16 @@ public class Context {
 	}
 	
 	private byte[] bytes;
+	
+	public byte[] getBytes() {
+		return  bytes;
+	}
 
-	public List<Command> deserialize() throws Exception {
+	public void setBytes(byte[] bytes) {
+		this.bytes = bytes;
+	}
+	
+	public List<Command> deserialize() throws IOException, InstantiationException, IllegalAccessException {
 		ByteArrayInputStream in = new ByteArrayInputStream(bytes);
 		DataInput input = new DataInputStream(in);
 		
@@ -51,7 +64,7 @@ public class Context {
 		return commands;
 	}
 
-	public void serialize(List<Command> commands) throws Exception {
+	public void serialize(List<? extends Command> commands) throws Exception {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		DataOutput output = new DataOutputStream(out);
 		
