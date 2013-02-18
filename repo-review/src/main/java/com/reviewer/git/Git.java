@@ -94,23 +94,37 @@ public class Git {
 	}
 
 	public static String version() throws IOException {
-		Process process = execGitAndWait("git --version");
-		BufferedReader reader = getReader(process);
-		return reader.readLine();
+		return execReadOnly("git --version").readLine();
 	}
 
 	public static String rev_parse(String refspec) throws IOException {
-		BufferedReader reader = execReadOnly(String.format("git rev-parse %s", refspec));
-		return reader.readLine();
+		return execReadOnly(String.format("git rev-parse %s", refspec)).readLine();
 	}
 	
-	public static List<String> rev_list_reversed(String begin, String end) throws IOException {
+	public static int[] rev_list_count_behind_and_ahead(String begin, String end) throws IOException {
+		String line = execReadOnly(String.format("git rev-list --left-right --count %s...%s", begin, end)).readLine();
+		
+		int behind = 0;
+		int ahead = 0;
+		
+		if(line != null) {
+			String[] readLine = line.split("[\t]");
+			behind = Integer.parseInt(readLine[0]);
+			ahead = Integer.parseInt(readLine[1]);
+		}
+		
+		return new int[] {behind, ahead};
+	}
+	
+	public static List<String> rev_list(String begin, String end, boolean reverse) throws IOException {
+		String rev = reverse ? "--reverse" : "";
+		
 		BufferedReader reader;
 		
 		if(begin != null && end != null)
-			reader = execReadOnly(String.format("git rev-list --reverse %s..%s", begin, end));
+			reader = execReadOnly(String.format("git rev-list %s %s %s", rev, begin, end));
 		else
-			reader = execReadOnly(String.format("git rev-list --reverse %s", begin != null ? begin : end));
+			reader = execReadOnly(String.format("git rev-list %s %s", rev, begin != null ? begin : end));
 		
 		List<String> commits = new ArrayList<String>();
 		String line;
@@ -119,8 +133,12 @@ public class Git {
 		
 		return commits;
 	}
+	
+	public static List<String> rev_list_range_reversed(String begin, String end) throws IOException {
+		return rev_list(begin != null ? "^" + begin : null, end, true);
+	}
 
-	public static void update_ref(String refspec, String sha1) throws IOException, InterruptedException {
+	public static void update_ref(String refspec, String sha1) throws IOException {
 		execGitAndWait(String.format("git update-ref %s %s", refspec, sha1));
 	}
 
@@ -142,8 +160,21 @@ public class Git {
 		return reader.readLine();
 	}
 
+	public static String calculate_hash(byte[] bytes) throws IOException {
+		return hash_object(bytes, false);
+	}
+	
 	public static String hash_object(byte[] bytes) throws IOException {
-		Process process = execGit("git hash-object -w --stdin");
+		return hash_object(bytes, true);
+	}
+	
+	public static String hash_object(byte[] bytes, boolean write) throws IOException {
+		Process process;
+		
+		if(write)
+			process = execGit("git hash-object -w --stdin");
+		else
+			process = execGit("git hash-object --stdin");
 
 		OutputStream stream = process.getOutputStream();
 		BufferedReader reader = getReader(process);
@@ -281,7 +312,7 @@ public class Git {
 	}
 	
 	public static String author_name_and_date(String sha1) throws IOException {
-		BufferedReader reader = execReadOnly(String.format("git log --format=\"%%an%%x09%%at\" -1 %s", sha1));
+		BufferedReader reader = execReadOnly(String.format("git log --format=%%an%%x09%%at -1 %s", sha1));
 		return reader.readLine();
 	}
 	
@@ -311,6 +342,10 @@ public class Git {
 	
 	public static String git_dir() throws IOException {
 		return execReadOnly("git rev-parse --git-dir").readLine();
+	}
+	
+	public static String merge_base(String a, String b) throws IOException {
+		return execReadOnly(String.format("git merge-base --octopus $s %s", a, b)).readLine();
 	}
 	
 	public static void main(String[] args) throws IOException {

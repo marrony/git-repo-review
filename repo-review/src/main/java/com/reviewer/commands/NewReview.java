@@ -13,11 +13,16 @@ import com.reviewer.model.Command;
 import com.reviewer.model.Reviewer;
 
 public class NewReview implements Command, GitObject {
-	public transient String reviewId = "";
-	public transient Date date;
+	public String reviewId = "";
+	public String message = "";
 	public List<String> commits = new ArrayList<String>();
+	public transient String user = "";
+	public transient Date date;
 	
 	public void read(DataInput input) throws IOException {
+		reviewId = IOUtil.readSha1(input);
+		message = IOUtil.readString(input);
+		
 		int size = input.readInt();
 		commits = new ArrayList<String>(size);
 		
@@ -26,6 +31,9 @@ public class NewReview implements Command, GitObject {
 	}
 
 	public void write(DataOutput output) throws IOException {
+		IOUtil.writeSha1(output, reviewId);
+		IOUtil.writeString(output, message);
+		
 		output.writeInt(commits.size());
 		
 		for(int i = 0; i < commits.size(); i++)
@@ -37,7 +45,7 @@ public class NewReview implements Command, GitObject {
 	}
 
 	public void gitInfo(String commit, String author, Date date) {
-		this.reviewId = commit;
+		this.user = author;
 		this.date = date;
 	}
 }

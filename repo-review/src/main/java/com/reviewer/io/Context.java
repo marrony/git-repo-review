@@ -64,7 +64,7 @@ public class Context {
 		return commands;
 	}
 
-	public void serialize(List<? extends Command> commands) throws Exception {
+	public void serialize(List<? extends Command> commands) throws IOException {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		DataOutput output = new DataOutputStream(out);
 		

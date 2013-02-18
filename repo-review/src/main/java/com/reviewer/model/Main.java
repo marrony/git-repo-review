@@ -45,32 +45,39 @@ public class Main {
 		}
 	}
 	
-	private static List<Command> getCommands(List<String> commits) throws IOException {
+	private static List<Command> getCommands(String commit) throws IOException {
+		Context context = new Context();
+		
 		List<Command> commands = new ArrayList<Command>();
 		
-		for(String commit : commits) {
-			Context context = new Context();
+		for(GitFile file : Git.ls_tree(commit)) {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			Git.cat_file(file.sha1, out);
 			
-			for(GitFile file : Git.ls_tree(commit)) {
-				ByteArrayOutputStream out = new ByteArrayOutputStream();
-				Git.cat_file(file.sha1, out);
+			try {
+				context.setBytes(out.toByteArray());
 				
-				try {
-					context.setBytes(out.toByteArray());
-					
-					List<Command> deserialized = context.deserialize();
-					
-					updateGitInfo(commit, deserialized);
-					commands.addAll(deserialized);
-				} catch(Exception e) {
-				}
+				List<Command> deserialized = context.deserialize();
+				
+				updateGitInfo(commit, deserialized);
+				commands.addAll(deserialized);
+			} catch(Exception e) {
 			}
 		}
 		
 		return commands;
 	}
 	
-	private static String commitCommands(List<? extends Command> commands) throws Exception {
+	private static List<Command> getCommands(List<String> commits) throws IOException {
+		List<Command> commands = new ArrayList<Command>();
+		
+		for(String commit : commits)
+			commands.addAll(getCommands(commit));
+		
+		return commands;
+	}
+	
+	private static String commitCommands(List<? extends Command> commands) throws IOException {
 		Context context = new Context();
 		context.serialize(commands);
 		
@@ -88,9 +95,29 @@ public class Main {
 		return commit;
 	}
 	
-	private static Command crateReview(String... commits) throws Exception {
+	private static void calculateHash(NewReview newReview) throws IOException {
+		String msg = "Message: " + newReview.message;
+		msg += "\nCommits: ";
+		
+		for(int i = 0; i < newReview.commits.size(); i++) {
+			String commit = newReview.commits.get(i);
+			
+			msg += commit;
+			
+			if(i < newReview.commits.size() - 1)
+				msg += ", ";
+		}
+		
+		msg += "\n";
+		
+		newReview.reviewId = Git.calculate_hash(msg.getBytes());
+	}
+	
+	private static NewReview crateReview(String message, String... commits) throws Exception {
 		NewReview newReview = new NewReview();
+		newReview.message = message;
 		newReview.commits.addAll(Arrays.asList(commits));
+		calculateHash(newReview);
 		return newReview;
 	}
 	
@@ -110,14 +137,18 @@ public class Main {
 		return addComment;
 	}
 	
-	private static void saveCache(Reviewer reviewer) throws IOException {
-		reviewer.lastCommit = getLastCommit();
+	private static void saveLocalCache(Reviewer reviewer) throws IOException {
+		saveLocalCache(reviewer, getLastCommit());
+	}
+	
+	private static void saveLocalCache(Reviewer reviewer, String lastCommit) throws IOException {
+		reviewer.lastCommit = lastCommit;
 		ObjectOutput output = new ObjectOutputStream(new FileOutputStream(getFile()));
 		output.writeObject(reviewer);
 		output.close();
 	}
 	
-	private static Reviewer loadCache() throws IOException {
+	private static Reviewer loadLocalCache() throws IOException {
 		Reviewer reviewer;
 		
 		try {
@@ -127,17 +158,43 @@ public class Main {
 			reviewer = new Reviewer();
 		}
 		
-		List<String> commits = Git.rev_list_reversed(reviewer.lastCommit, "refs/heads/review");
+		doRebase(reviewer);
+		updateMemory(reviewer);
+		
+		return reviewer;
+	}
+
+	private static void updateMemory(Reviewer reviewer) throws IOException {
+		List<String> commits = Git.rev_list_range_reversed(reviewer.lastCommit, "refs/heads/review");
+		
+		if(!commits.isEmpty())
+			reviewer.apply(getCommands(commits));
+	}
+
+	private static void doRebase(Reviewer reviewer) throws IOException {
+		int counts[] = Git.rev_list_count_behind_and_ahead("refs/remotes/origin/review", "refs/heads/review");
+		
+		boolean needRebase = counts[0] != 0 && counts[1] != 0;
+		if(!needRebase) return;
+		
+		List<String> nonFastForwardCommits = Git.rev_list_range_reversed("refs/remotes/origin/review", "refs/heads/review");
+		
+		Git.update_ref("refs/heads/review", "refs/remotes/origin/review");
+		
+		for(String commit : nonFastForwardCommits)
+			commitCommands(getCommands(commit));
+		
+		List<String> commits = Git.rev_list_range_reversed(reviewer.lastCommit, "refs/remotes/origin/review");
 		
 		if(!commits.isEmpty())
 			reviewer.apply(getCommands(commits));
 		
-		return reviewer;
+		saveLocalCache(reviewer, Git.rev_parse("refs/remotes/origin/review"));
 	}
 	
 	private static void sendToServer(Reviewer reviewer) throws IOException {
 		if(Git.push("origin", "review"))
-			saveCache(reviewer);
+			saveLocalCache(reviewer);
 	}
 	
 	private static void cleanup() throws IOException {
@@ -153,22 +210,27 @@ public class Main {
 	public static void main(String[] args) throws Exception {
 //		cleanup();
 		
-		Reviewer reviewer = loadCache();
+		Reviewer reviewer = loadLocalCache();
 		
-		List<Command> commands = new ArrayList<Command>();
-		commands.add(crateReview("c719433a83d749d572b9ca8875b5f4009a4bc537"));
-		commitCommands(commands);
+//		for(int i = 0; i < 2; i++) {
+//		List<Command> commands = new ArrayList<Command>();
+//		NewReview newReview = crateReview("do this review", "c719433a83d749d572b9ca8875b5f4009a4bc537");
+//		commands.add(newReview);
+//		commitCommands(commands);
+//		
+//		reviewer.apply(commands);
+//		commands.clear();
+//		
+//		String reviewId = newReview.reviewId;
+//		commands.add(createComment(reviewId, "new comment"));
+//		commands.add(createFileComment(reviewId, "file.txt", 10, "new comment"));
+//		commitCommands(commands);
+//		
+//		reviewer.apply(commands);
+//		}
 		
-		reviewer.apply(commands);
-		commands.clear();
+		//sendToServer(reviewer);
 		
-		String reviewId = getLastCommit();
-		commands.add(createComment(reviewId, "new comment"));
-		commands.add(createFileComment(reviewId, "file.txt", 10, "new comment"));
-		commitCommands(commands);
-		
-		reviewer.apply(commands);
-		
-		sendToServer(reviewer);
+		System.out.println(reviewer);
 	}
 }
