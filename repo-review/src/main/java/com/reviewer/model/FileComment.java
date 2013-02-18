@@ -1,8 +1,11 @@
 package com.reviewer.model;
 
+import java.io.Serializable;
 import java.util.Date;
 
-public class FileComment {
+public class FileComment implements Serializable {
+	
+	private static final long serialVersionUID = 1L;
 
 	private final String file;
 	private final int line;

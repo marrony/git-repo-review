@@ -45,8 +45,8 @@ public class Git {
 		return Runtime.getRuntime().exec(format);
 	}
 
-	private static Process execGitAndWait(String format) throws IOException {
-		Process process = Runtime.getRuntime().exec(format);
+	private static Process execGitAndWait(String cmd) throws IOException {
+		Process process = Runtime.getRuntime().exec(cmd);
 		
 		try {
 			process.waitFor();
@@ -56,14 +56,16 @@ public class Git {
 		return process;
 	}
 	
+	private static BufferedReader execReadOnly(String cmd) throws IOException {
+		return getReader(execGitAndWait(cmd));
+	}
+	
 	private static BufferedReader getReader(Process process) {
-		return new BufferedReader(new InputStreamReader(
-				process.getInputStream()));
+		return new BufferedReader(new InputStreamReader(process.getInputStream()));
 	}
 
 	private static BufferedWriter getWriter(final Process process) {
-		return new BufferedWriter(new OutputStreamWriter(
-				process.getOutputStream()));
+		return new BufferedWriter(new OutputStreamWriter(process.getOutputStream()));
 	}
 
 	private static boolean S_ISDIR(int mode) {
@@ -98,14 +100,28 @@ public class Git {
 	}
 
 	public static String rev_parse(String refspec) throws IOException {
-		Process process = execGitAndWait(String.format("git rev-parse %s", refspec));
-		BufferedReader reader = getReader(process);
+		BufferedReader reader = execReadOnly(String.format("git rev-parse %s", refspec));
 		return reader.readLine();
+	}
+	
+	public static List<String> rev_list_reversed(String begin, String end) throws IOException {
+		BufferedReader reader;
+		
+		if(begin != null && end != null)
+			reader = execReadOnly(String.format("git rev-list --reverse %s..%s", begin, end));
+		else
+			reader = execReadOnly(String.format("git rev-list --reverse %s", begin != null ? begin : end));
+		
+		List<String> commits = new ArrayList<String>();
+		String line;
+		while((line = reader.readLine()) != null)
+			commits.add(line);
+		
+		return commits;
 	}
 
 	public static void update_ref(String refspec, String sha1) throws IOException, InterruptedException {
-		Process process = execGitAndWait(String.format("git update-ref %s %s", refspec, sha1));
-		process.waitFor();
+		execGitAndWait(String.format("git update-ref %s %s", refspec, sha1));
 	}
 
 	public static String commit_tree(String message, String tsha1, String parent) throws IOException {
@@ -139,12 +155,11 @@ public class Git {
 	}
 
 	public static void add(String filename) throws IOException {
-		execGit(String.format("git add %s", filename));
+		execGitAndWait(String.format("git add %s", filename));
 	}
 
 	public static String write_tree() throws IOException {
-		Process process = execGitAndWait("git write-tree");
-		BufferedReader reader = getReader(process);
+		BufferedReader reader = execReadOnly("git write-tree");
 		return reader.readLine();
 	}
 
@@ -187,9 +202,8 @@ public class Git {
 	}
 	
 	public static String file_type(String sha1) throws IOException {
-		Process process = execGitAndWait(String.format("git cat-file -t %s", sha1));
-		
-		return getReader(process).readLine();
+		BufferedReader reader = execReadOnly(String.format("git cat-file -t %s", sha1));
+		return reader.readLine();
 	}
 	
 	public static class GitFile {
@@ -200,15 +214,13 @@ public class Git {
 	}
 
 	public static List<GitFile> ls_tree(String tree) throws IOException {
-		final Process process;
+		BufferedReader reader;
 		
 		if("tree".equals(file_type(tree))) {
-			process = execGitAndWait(String.format("git cat-file -p tree", tree));
+			reader = execReadOnly(String.format("git cat-file -p tree", tree));
 		} else {
-			process = execGitAndWait(String.format("git cat-file -p %s^{tree}", tree));
+			reader = execReadOnly(String.format("git cat-file -p %s^{tree}", tree));
 		}
-		
-		BufferedReader reader = getReader(process);
 		
 		List<GitFile> files = new ArrayList<GitFile>();
 		
@@ -234,15 +246,23 @@ public class Git {
 		return files;
 	}
 	
-	public static void delete_branch(String branch, boolean force) throws IOException {
+	public static boolean delete_branch(String branch, boolean force) throws IOException {
+		final String cmd;
+		
 		if(force)
-			execGitAndWait(String.format("git branch -D %s", branch));
+			cmd = String.format("git branch -D %s", branch);
 		else
-			execGitAndWait(String.format("git branch -d %s", branch));
+			cmd = String.format("git branch -d %s", branch);
+		
+		return execGitAndWait(cmd).exitValue() == 0;
 	}
 	
-	public static void delete_branch(String branch) throws IOException {
-		delete_branch(branch, false);
+	public static boolean delete_branch(String branch) throws IOException {
+		return delete_branch(branch, false);
+	}
+	
+	public static boolean delete_remote_branch(String remote, String branch) throws IOException {
+		return push(remote, ":" + branch);
 	}
 
 	public static void cat_file(String sha1, OutputStream out) throws IOException {
@@ -261,9 +281,36 @@ public class Git {
 	}
 	
 	public static String author_name_and_date(String sha1) throws IOException {
-		Process process = execGitAndWait(String.format("git log --format=\"%%an%%x09%%at\" %s", sha1));
-		BufferedReader reader = getReader(process);
+		BufferedReader reader = execReadOnly(String.format("git log --format=\"%%an%%x09%%at\" -1 %s", sha1));
 		return reader.readLine();
+	}
+	
+	public static boolean fetch(String remote, String branch) throws IOException {
+		String cmd = "git fetch";
+		
+		if(remote != null)
+			cmd += " " + remote;
+		
+		if(branch != null)
+			cmd += " " + branch;
+		
+		return execGitAndWait(cmd).exitValue() == 0;
+	}
+	
+	public static boolean push(String remote, String branch) throws IOException {
+		String cmd = "git push";
+		
+		if(remote != null)
+			cmd += " " + remote;
+		
+		if(branch != null)
+			cmd += " " + branch;
+		
+		return execGitAndWait(cmd).exitValue() == 0;
+	}
+	
+	public static String git_dir() throws IOException {
+		return execReadOnly("git rev-parse --git-dir").readLine();
 	}
 	
 	public static void main(String[] args) throws IOException {

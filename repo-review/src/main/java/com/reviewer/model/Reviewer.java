@@ -1,13 +1,16 @@
 package com.reviewer.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-
-public class Reviewer {
+public class Reviewer implements Serializable {
+	
+	private static final long serialVersionUID = 1L;
 	
 	private List<Review> reviews = new ArrayList<Review>();
+	public String lastCommit;
 	
 	public void apply(List<? extends Command> commands) {
 		for(Command command : commands)

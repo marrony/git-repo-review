@@ -1,10 +1,13 @@
 package com.reviewer.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-public class Review {
+public class Review implements Serializable {
+	
+	private static final long serialVersionUID = 1L;
 
 	public String reviewId;
 	public List<String> commits;
