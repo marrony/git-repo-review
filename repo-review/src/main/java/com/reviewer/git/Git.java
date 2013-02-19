@@ -345,7 +345,11 @@ public class Git {
 	}
 	
 	public static String merge_base(String a, String b) throws IOException {
-		return execReadOnly(String.format("git merge-base --octopus $s %s", a, b)).readLine();
+		return execReadOnly(String.format("git merge-base --octopus %s %s", a, b)).readLine();
+	}
+
+	public static String get_tree(String commit) throws IOException {
+		return execReadOnly(String.format("git show -s --format=%%T %s", commit)).readLine();
 	}
 	
 	public static void main(String[] args) throws IOException {
@@ -364,5 +368,4 @@ public class Git {
 
 		System.out.println(Git.rev_parse("refs/heads/review"));
 	}
-
 }

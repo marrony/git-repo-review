@@ -77,6 +77,15 @@ public class Main {
 		return commands;
 	}
 	
+	private static String cherryPick(String commit, String parent) throws IOException {
+		String tree = Git.get_tree(commit);
+		
+		String newCommit = Git.commit_tree("new review", tree, parent);
+		Git.update_ref("refs/heads/review", newCommit);
+		
+		return newCommit;
+	}
+	
 	private static String commitCommands(List<? extends Command> commands) throws IOException {
 		Context context = new Context();
 		context.serialize(commands);
@@ -181,8 +190,10 @@ public class Main {
 		
 		Git.update_ref("refs/heads/review", "refs/remotes/origin/review");
 		
-		for(String commit : nonFastForwardCommits)
-			commitCommands(getCommands(commit));
+		for(String commit : nonFastForwardCommits) {
+			cherryPick(commit, getLastCommit());
+			//commitCommands(getCommands(commit));
+		}
 		
 		List<String> commits = Git.rev_list_range_reversed(reviewer.lastCommit, "refs/remotes/origin/review");
 		
