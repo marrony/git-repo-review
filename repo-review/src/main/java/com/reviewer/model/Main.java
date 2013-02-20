@@ -1,6 +1,5 @@
 package com.reviewer.model;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -166,6 +165,12 @@ public class Main {
 			reviewer = new Reviewer();
 		}
 		
+		String reviewLocal = Git.rev_parse("refs/heads/review");
+		String reviewRemote = Git.rev_parse("refs/remotes/origin/review");
+		
+		if(reviewRemote != null && "refs/heads/review".equals(reviewLocal))
+			Git.update_ref("refs/heads/review", reviewRemote);
+		
 		doRebase(reviewer);
 		updateMemory(reviewer);
 		
@@ -272,8 +277,16 @@ public class Main {
 				System.out.println(String.format("file commented"));
 			}
 			
+			if("cleanup".equals(arg[0])) {
+				cleanup();
+				
+				System.out.println("you just make a big shit");
+			}
+			
 			if("send".equals(arg[0])) {
 				sendToServer(reviewer);
+				
+				System.out.println("all local changes was sent to server");
 			}
 		}
 	}
