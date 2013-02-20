@@ -17,4 +17,8 @@ public class Comment implements Serializable {
 		this.date = date;
 	}
 
+	@Override
+	public String toString() {
+		return user + " " + comment;
+	}
 }

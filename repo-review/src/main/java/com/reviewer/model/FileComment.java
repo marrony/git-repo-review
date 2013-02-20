@@ -20,4 +20,9 @@ public class FileComment implements Serializable {
 		this.user = user;
 		this.date = date;
 	}
+	
+	@Override
+	public String toString() {
+		return String.format("%s %s(%d) %s", user, file, line, comment);
+	}
 }

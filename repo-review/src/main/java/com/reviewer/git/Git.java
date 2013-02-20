@@ -312,8 +312,23 @@ public class Git {
 	}
 	
 	public static String author_name_and_date(String sha1) throws IOException {
-		BufferedReader reader = execReadOnly(String.format("git log --format=%%an%%x09%%at -1 %s", sha1));
-		return reader.readLine();
+		return execReadOnly(String.format("git log --format=%%an%%x09%%at -1 %s", sha1)).readLine();
+	}
+	
+	public static String var(String var) throws IOException {
+		return execReadOnly(String.format("git var %s", var)).readLine();
+	}
+	
+	public static String config(String config) throws IOException {
+		return execReadOnly(String.format("git config --get %s", config)).readLine();
+	}
+	
+	public static String user_name() throws IOException {
+		return config("user.name");
+	}
+	
+	public static String user_email() throws IOException {
+		return config("user.email");
 	}
 	
 	public static boolean fetch(String remote, String branch) throws IOException {

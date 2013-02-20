@@ -41,7 +41,7 @@ public class NewReview implements Command, GitObject {
 	}
 
 	public void apply(Reviewer system) {
-		system.createReview(reviewId, commits);
+		system.createReview(reviewId, message, commits);
 	}
 
 	public void gitInfo(String commit, String author, Date date) {

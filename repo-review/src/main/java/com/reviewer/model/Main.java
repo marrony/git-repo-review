@@ -1,10 +1,13 @@
 package com.reviewer.model;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
@@ -105,19 +108,15 @@ public class Main {
 	}
 	
 	private static void calculateHash(NewReview newReview) throws IOException {
-		String msg = "Message: " + newReview.message;
-		msg += "\nCommits: ";
+		String msg = "committer " + Git.var("GIT_COMMITTER_IDENT") + "\n";
 		
 		for(int i = 0; i < newReview.commits.size(); i++) {
 			String commit = newReview.commits.get(i);
 			
-			msg += commit;
-			
-			if(i < newReview.commits.size() - 1)
-				msg += ", ";
+			msg += "commit " + commit + "\n";
 		}
 		
-		msg += "\n";
+		msg += "\n" + newReview.message;
 		
 		newReview.reviewId = Git.calculate_hash(msg.getBytes());
 	}
@@ -130,7 +129,7 @@ public class Main {
 		return newReview;
 	}
 	
-	private static Command createFileComment(String reviewId, String file, int line, String comment) {
+	private static AddFileComment createFileComment(String reviewId, String file, int line, String comment) {
 		AddFileComment addFileComment = new AddFileComment();
 		addFileComment.comment = comment;
 		addFileComment.file = file;
@@ -139,7 +138,7 @@ public class Main {
 		return addFileComment;
 	}
 
-	private static Command createComment(String reviewId, String comment) {
+	private static AddComment createComment(String reviewId, String comment) {
 		AddComment addComment = new AddComment();
 		addComment.comment = comment;
 		addComment.reviewId = reviewId;
@@ -223,25 +222,59 @@ public class Main {
 		
 		Reviewer reviewer = loadLocalCache();
 		
-//		for(int i = 0; i < 2; i++) {
-//		List<Command> commands = new ArrayList<Command>();
-//		NewReview newReview = crateReview("do this review", "c719433a83d749d572b9ca8875b5f4009a4bc537");
-//		commands.add(newReview);
-//		commitCommands(commands);
-//		
-//		reviewer.apply(commands);
-//		commands.clear();
-//		
-//		String reviewId = newReview.reviewId;
-//		commands.add(createComment(reviewId, "new comment"));
-//		commands.add(createFileComment(reviewId, "file.txt", 10, "new comment"));
-//		commitCommands(commands);
-//		
-//		reviewer.apply(commands);
-//		}
+		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+		String line;
 		
-		//sendToServer(reviewer);
-		
-		System.out.println(reviewer);
+		while((line = in.readLine()) != null) {
+			String[] arg = line.split("[ ]");
+			
+			if("new-review".equals(arg[0])) {
+				NewReview newReview = crateReview(arg[1], Arrays.copyOfRange(arg, 2, arg.length));
+				commitCommands(Arrays.asList(newReview));
+				reviewer.apply(Arrays.asList(newReview));
+				
+				System.out.println(String.format("new review created: %s", newReview.reviewId));
+			}
+			
+			if("list-review".equals(arg[0])) {
+				List<Review> reviews = reviewer.getReviews();
+				for(Review review : reviews)
+					System.out.println(String.format("%s %s", review.reviewId, review.message));
+			}
+			
+			if("list-comments".equals(arg[0])) {
+				Review review = reviewer.findReview(arg[1]);
+				
+				for(Comment comment : review.comments)
+					System.out.println(comment);
+			}
+			
+			if("list-file-comments".equals(arg[0])) {
+				Review review = reviewer.findReview(arg[1]);
+				
+				for(FileComment fileComment : review.fileComments)
+					System.out.println(fileComment);
+			}
+			
+			if("add-comment".equals(arg[0])) {
+				AddComment addComment = createComment(arg[1], arg[2]);
+				commitCommands(Arrays.asList(addComment));
+				reviewer.apply(Arrays.asList(addComment));
+				
+				System.out.println(String.format("review commented"));
+			}
+			
+			if("add-file-comment".equals(arg[0])) {
+				AddFileComment addFileComment = createFileComment(arg[1], arg[2], Integer.parseInt(arg[3]), arg[4]);
+				commitCommands(Arrays.asList(addFileComment));
+				reviewer.apply(Arrays.asList(addFileComment));
+				
+				System.out.println(String.format("file commented"));
+			}
+			
+			if("send".equals(arg[0])) {
+				sendToServer(reviewer);
+			}
+		}
 	}
 }

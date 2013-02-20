@@ -2,6 +2,7 @@ package com.reviewer.model;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -17,8 +18,8 @@ public class Reviewer implements Serializable {
 			command.apply(this);
 	}
 
-	public Review createReview(String hash, List<String> commits) {
-		Review review = new Review(hash, commits);
+	public Review createReview(String hash, String message, List<String> commits) {
+		Review review = new Review(hash, message, commits);
 		reviews.add(review);
 		return review;
 	}
@@ -33,10 +34,15 @@ public class Reviewer implements Serializable {
 		review.addFileComment(file, line, comment, user, date);
 	}
 	
-	private Review findReview(String hash) {
+	public Review findReview(String hash) {
 		for(Review review : reviews)
 			if(review.reviewId.equals(hash))
 				return review;
-		return null;
+		
+		throw new RuntimeException(String.format("Review %s not found", hash));
+	}
+
+	public List<Review> getReviews() {
+		return Collections.unmodifiableList(reviews);
 	}
 }

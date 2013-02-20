@@ -10,12 +10,14 @@ public class Review implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	public String reviewId;
+	public final String message;
 	public List<String> commits;
 	public List<Comment> comments = new ArrayList<Comment>();
 	public List<FileComment> fileComments = new ArrayList<FileComment>();
 
-	public Review(String reviewId, List<String> commits) {
+	public Review(String reviewId, String message, List<String> commits) {
 		this.reviewId = reviewId;
+		this.message = message;
 		this.commits = commits;
 	}
 
