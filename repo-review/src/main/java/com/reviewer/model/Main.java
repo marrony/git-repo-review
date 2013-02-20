@@ -187,24 +187,25 @@ public class Main {
 	private static void doRebase(Reviewer reviewer) throws IOException {
 		int counts[] = Git.rev_list_count_behind_and_ahead("refs/remotes/origin/review", "refs/heads/review");
 		
-		boolean needRebase = counts[0] != 0 && counts[1] != 0;
-		if(!needRebase) return;
+		if(counts[0] == 0 && counts[1] == 0)
+			return;
 		
-		List<String> nonFastForwardCommits = Git.rev_list_range_reversed("refs/remotes/origin/review", "refs/heads/review");
-		
-		Git.update_ref("refs/heads/review", "refs/remotes/origin/review");
-		
-		for(String commit : nonFastForwardCommits) {
-			cherryPick(commit, getLastCommit());
-			//commitCommands(getCommands(commit));
+		if(counts[0] != 0 && counts[1] != 0) {
+			List<String> nonFastForwardCommits = Git.rev_list_range_reversed("refs/remotes/origin/review", "refs/heads/review");
+			
+			Git.update_ref("refs/heads/review", "refs/remotes/origin/review");
+			
+			for(String commit : nonFastForwardCommits)
+				cherryPick(commit, getLastCommit());
+		} else {
+			List<String> commits = Git.rev_list_range_reversed(reviewer.lastCommit, "refs/remotes/origin/review");
+			
+			if(!commits.isEmpty())
+				reviewer.apply(getCommands(commits));
+			
+			Git.update_ref("refs/heads/review", "refs/remotes/origin/review");
+			saveLocalCache(reviewer, Git.rev_parse("refs/remotes/origin/review"));
 		}
-		
-		List<String> commits = Git.rev_list_range_reversed(reviewer.lastCommit, "refs/remotes/origin/review");
-		
-		if(!commits.isEmpty())
-			reviewer.apply(getCommands(commits));
-		
-		saveLocalCache(reviewer, Git.rev_parse("refs/remotes/origin/review"));
 	}
 	
 	private static void sendToServer(Reviewer reviewer) throws IOException {
